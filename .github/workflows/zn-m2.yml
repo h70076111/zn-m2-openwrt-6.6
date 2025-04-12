@@ -110,11 +110,11 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P3_SH
         
-    - name: Apply Patch for removing usb and wifi support 
-      run: |
-        set -x
-        cd openwrt
-        patch -p001 < $GITHUB_WORKSPACE/patch/001_remove_wifi.patch
+    # - name: Apply Patch for removing usb and wifi support 
+    #   run: |
+    #     set -x
+    #     cd openwrt
+    #     patch -p001 < $GITHUB_WORKSPACE/patch/001_remove_wifi.patch
         
     - name: Download package
       id: package
