@@ -6,8 +6,6 @@ linux内核为6.6，原仓库请见workflow文件
 插件如下
 - luci-app-zerotier
 - luci-app-passwall
-- adguardhome
-- luci-app-smartdns
 - luci-app-qos
 # 展示固件
 
