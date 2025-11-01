@@ -81,23 +81,8 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    # - name: Load custom feeds
-    #   run: |
-    #     set -x
-    #     [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-    #     chmod +x $DIY_P1_SH
-    #     cd openwrt
-    #     $GITHUB_WORKSPACE/$DIY_P1_SH
-
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
-
-    # - name: Modify feeds
-    #   run: |
-    #     set -x
-    #     chmod +x $DIY_P2_SH
-    #     cd openwrt
-    #     $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
@@ -110,12 +95,6 @@ jobs:
         chmod +x $DIY_P3_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P3_SH
-        
-    # - name: Apply Patch for removing usb and wifi support 
-    #   run: |
-    #     set -x
-    #     cd openwrt
-    #     patch -p001 < $GITHUB_WORKSPACE/patch/001_remove_wifi.patch
         
     - name: Download package
       id: package
@@ -147,26 +126,22 @@ jobs:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
     
-    - name: Publish firmware *.bin to Release
+    - name: Pack openwrt/bin as tar.gz
+      if: steps.compile.outputs.status == 'success' && !cancelled() && env.UPLOAD_RELEASE == 'true'
+      run: |
+        TAR=openwrt-bin-${{ github.run_number }}.tar.gz
+        tar -czf "$TAR" -C openwrt bin
+        sha256sum "$TAR" > "$TAR".sha256
+    
+    - name: Publish packages dir to Release
       uses: softprops/action-gh-release@v2
-      if: steps.compile.outputs.status == 'success' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && !cancelled() && env.UPLOAD_RELEASE == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: OpenWrt-23.05-${{ github.run_number }}
         body_path: release.txt
-        files: ${{ env.FIRMWARE }}/targets/*/*/*.bin
-    # - name: Organize files
-    #   id: organize
-    #   run: |
-    #     cd openwrt/bin/targets/*/*
-    #     rm -rf packages
-    #     echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-    #     echo "status=success" >> $GITHUB_OUTPUT
+        files: |
+          openwrt-bin-${{ github.run_number }}.tar.gz
+          openwrt-bin-${{ github.run_number }}.tar.gz.sha256
 
-    # - name: Upload firmware directory
-    #   uses: actions/upload-artifact@main
-    #   if: steps.organize.outputs.status == 'success' && !cancelled()
-    #   with:
-    #     name: ipq6000${{ env.FILE_DATE }}
-    #     path: ${{ env.FIRMWARE }}
