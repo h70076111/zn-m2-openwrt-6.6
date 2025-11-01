@@ -149,7 +149,7 @@ jobs:
     
     - name: Publish firmware *.bin to Release
       uses: softprops/action-gh-release@v2
-      if: steps.organize.outputs.status == 'success' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
