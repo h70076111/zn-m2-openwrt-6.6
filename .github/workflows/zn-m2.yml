@@ -27,7 +27,9 @@ env:
   UPLOAD_BIN_DIR: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
-
+  TERM: dumb
+  DEBIAN_FRONTEND: noninteractive
+  
 jobs:
   build:
     runs-on: ${{ inputs.runner_choice == 'self-hosted'
@@ -79,11 +81,57 @@ jobs:
       run: |
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         
-    - name: Update feeds
-      run: cd openwrt && ./scripts/feeds update -a
+    - name: Check Caches
+      id: check-cache
+      uses: actions/cache@v4
+      with:
+        key: ${{env.CONFIG_FILE}}-${{env.REPO_URL}}-${{hashFiles('openwrt/.config')}}
+        restore-keys: ${{env.CONFIG_FILE}}-${{env.REPO_URL}}
+        path: |
+          ./openwrt/.ccache
+          ./openwrt/staging_dir/host*
+          ./openwrt/staging_dir/tool*
 
-    - name: Install feeds
-      run: cd openwrt && ./scripts/feeds install -a
+    - name: Update Caches
+      env:
+        CACHE_HIT: ${{ steps.check-cache.outputs.cache-hit }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 必須提供 Token 才能刪除快取
+      run: |
+        # 1. 處理時間戳，防止恢復快取後重新編譯
+        if [ -d "./openwrt/staging_dir" ]; then
+          find "./openwrt/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r DIR; do
+            find "$DIR" -type f -exec touch {} +
+          done
+          mkdir -p ./openwrt/tmp && echo "1" > ./openwrt/tmp/.build
+          echo "Toolchain/Host stamps touched, skip re-compile!"
+        else
+          echo "Caches missed!"
+        fi
+
+        # 2. 如果快取未命中，清理舊的快取以釋放空間
+        if [ "$CACHE_HIT" != 'true' ]; then
+          echo "Cleaning up old caches..."
+          # 獲取符合 key 前綴的快取列表並刪除
+          gh cache list --limit 100 --key "${{ env.CONFIG_FILE }}-${{ env.REPO_URL }}" | cut -f 1 | while read -r cache_key; do
+            gh cache delete "$cache_key"
+          done
+          echo "Old caches cleanup done!"
+        fi
+          
+    - name: Load custom feeds
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: Update & Install feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+        # 在執行 DIY 腳本前，先清理可能導致衝突的舊配置
+        rm -f .config* 
 
     - name: Load custom configuration
       run: |
@@ -102,13 +150,14 @@ jobs:
         make download -j4
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
+        find . -maxdepth 3 -mindepth 1 -type d
 
     - name: Compile the firmware
       id: compile
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) V=sc
+        make -j$(nproc) || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
@@ -127,16 +176,45 @@ jobs:
         TAR=openwrt-bin-${{ github.run_number }}.tar.gz
         tar -czf "$TAR" -C openwrt bin
         sha256sum "$TAR" > "$TAR".sha256
-    
+
+    - name: Prepare and Organize Files
+      id: organize
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true'
+      run: |
+        cd openwrt/
+        mkdir ./upload/
+        
+        # 1. 複製編譯配置 .config 備份
+        cp -f .config ./upload/Config-${{ env.DEVICE_NAME }}-${{ env.FILE_DATE }}.txt
+
+        # 2. 提取內核版本和插件列表 (用於 Release Body)
+        echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
+        echo "WRT_LIST=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^luci-(app|theme)[^ ]*' {} \; | tr '\n' ' ')" >> $GITHUB_ENV
+
+        # 3. 清理不需要的編譯殘留文件
+        find ./bin/targets/ -iregex ".*\(buildinfo\|json\|sha256sums\|packages\)$" -exec rm -rf {} +
+
+        # 4. 尋找並重命名固件文件（提取所有 bin/img 等固件）
+        # 這裡會遍歷 targets 目錄，並移動到 upload 文件夾
+        for FILE in $(find ./bin/targets/ -type f -name "*.*") ; do
+          # 獲取檔名和副檔名
+          BASENAME=$(basename $FILE)
+          # 將文件移入上傳目錄
+          mv -f $FILE ./upload/
+        done
+        
+        echo "status=success" >> $GITHUB_OUTPUT
+
     - name: Publish packages dir to Release
       uses: softprops/action-gh-release@v2
       if: steps.compile.outputs.status == 'success' && !cancelled() && env.UPLOAD_RELEASE == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: OpenWrt-${{ github.run_number }}
+        tag_name: OpenWrt-${{ env.DEVICE_NAME }}-${{ env.FILE_DATE }}
         body_path: release.txt
         files: |
           openwrt-bin-${{ github.run_number }}.tar.gz
           openwrt-bin-${{ github.run_number }}.tar.gz.sha256
+          openwrt/upload/*
 
