@@ -12,3 +12,8 @@
 
 # Uncomment a feed source
 #echo 'src-git custom https://github.com/xiaorouji/openwrt-passwall.git;packages' >>feeds.conf.default
+
+# istore
+echo 'src-git store https://github.com/linkease/istore.git;main' >>feeds.conf.default
+# argon, etc.
+echo 'src-git third https://github.com/jjm2473/openwrt-third.git;main' >>feeds.conf.default
