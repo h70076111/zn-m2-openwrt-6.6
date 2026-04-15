@@ -170,26 +170,27 @@ jobs:
         cd openwrt/
         mkdir ./upload/
         
-        # 1. 複製編譯配置 .config 備份
-        cp -f .config ./upload/Config-${{ env.DEVICE_NAME }}-${{ env.FILE_DATE }}.txt
+        # 1. 备份配置
+        cp -f .config ./upload/Config-${{ env.FILE_DATE }}.txt
 
-        # 2. 提取內核版本和插件列表 (用於 Release Body)
-        echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
-        echo "WRT_LIST=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^luci-(app|theme)[^ ]*' {} \; | tr '\n' ' ')" >> $GITHUB_ENV
+        # 2. 提取信息
+        echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \; | head -n 1)" >> $GITHUB_ENV
+        # 限制插件列表长度，防止 Release Body 过长导致失败
+        echo "WRT_LIST=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^luci-(app|theme)[^ ]*' {} \; | head -n 20 | tr '\n' ' ')" >> $GITHUB_ENV
 
-        # 3. 清理不需要的編譯殘留文件
-        find ./bin/targets/ -iregex ".*\(buildinfo\|json\|sha256sums\|packages\)$" -exec rm -rf {} +
-
-        # 4. 尋找並重命名固件文件（提取所有 bin/img 等固件）
-        # 這裡會遍歷 targets 目錄，並移動到 upload 文件夾
-        for FILE in $(find ./bin/targets/ -type f -name "*.*") ; do
-          # 獲取檔名和副檔名
-          BASENAME=$(basename $FILE)
-          # 將文件移入上傳目錄
-          mv -f $FILE ./upload/
+        # 3. 移动固件（重点：只抓取常见的固件格式）
+        # 加上 -L 是为了防止软链接失效
+        find ./bin/targets/ -type f \( -name "*.bin" -o -name "*.img*" -o -name "*.gz" -o -name "*.mbi" \) | while read -r FILE; do
+          mv -f "$FILE" ./upload/
         done
         
-        echo "status=success" >> $GITHUB_OUTPUT
+        # 检查是否真的有文件被移入
+        if [ "$(ls -A ./upload/)" ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+        else
+          echo "No firmware files found!"
+          exit 1
+        fi
 
     - name: Publish to Release
       uses: softprops/action-gh-release@v2
