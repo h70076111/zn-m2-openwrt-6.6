@@ -32,3 +32,9 @@ sed -i 's/libcrypt/libxcrypt/g' package/feeds/packages/*/Makefile
 #LINUX_VERSION-6.6 = .93
 #LINUX_KERNEL_HASH-6.6.93 = 0d79ff359635e9f009f1e330deed5f3aefd8c452b80660bffdc504b877797719
 #EOF
+
+#配置文件修改
+echo "CONFIG_PACKAGE_luci=y" >> ./.config
+echo "CONFIG_LUCI_LANG_zh_Hans=y" >> ./.config
+echo "CONFIG_PACKAGE_luci-theme-$WRT_THEME=y" >> ./.config
+echo "CONFIG_PACKAGE_luci-app-$WRT_THEME-config=y" >> ./.config
