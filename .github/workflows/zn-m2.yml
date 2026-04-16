@@ -46,7 +46,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           retain_days: 0 
-          keep_minimum_runs: 0      
+          keep_minimum_runs: 1      
           delete_run_by_conclusion_pattern: "failure,cancelled,skipped,timed_out,success"
     
     - name: Free Disk Space
