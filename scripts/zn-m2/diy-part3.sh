@@ -49,5 +49,27 @@ sed -i 's/0x4b000000 0x0 0x05f00000/0x4b000000 0x0 0x01000000/g' target/linux/qu
 cat target/linux/qualcommax/patches-6.6/0102-arm64-dts-ipq8074-add-reserved-memory-nodes.patch
 
 # openwrtfork/libwrt修改地址
-DTS_PATH="./target/linux/qualcommax/files/arch/arm64/boot/dts/qcom"
-find $DTS_PATH -type f ! -iname '*nowifi*' -exec sed -i 's/ipq\(6018\|8074\).dtsi/ipq\1-nowifi.dtsi/g' {} +
+DTS_PATH2="./target/linux/qualcommax/files/arch/arm64/boot/dts/qcom"
+find $DTS_PATH2 -type f ! -iname '*nowifi*' -exec sed -i 's/ipq\(6018\|8074\).dtsi/ipq\1-nowifi.dtsi/g' {} +
+
+cat << EOF > $DTS_PATH2/ipq6018-nowifi.dtsi
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+#include "ipq6018.dtsi"
+
+&q6_region {
+	reg = <0x0 0x4ab00000 0x0 0x1000000>;
+};
+
+&q6_etr_region {
+	reg = <0x0 0x4bb00000 0x0 0x100000>;
+};
+
+&m3_dump_region {
+	reg = <0x0 0x4bc00000 0x0 0x100000>;
+};
+
+&ramoops_region {
+	reg = <0x0 0x4bd00000 0x0 0x100000>;
+};
+EOF
