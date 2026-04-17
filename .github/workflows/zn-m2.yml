@@ -207,7 +207,7 @@ jobs:
               extension="${filename##*.}"
               filename="${filename%.*}"
               # 重命名為: 原名_時間.擴展名
-              mv "$file" "./upload/${filename}_${{ env.DEVICE_NAME }}_${{ env.FILE_DATE }}.${extension}"
+              mv "$file" "./upload/${filename}_${{ env.FILE_DATE }}.${extension}"
             fi
           done
         else
