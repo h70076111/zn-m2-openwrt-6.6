@@ -20,8 +20,8 @@ env:
   DEVICE_NAME: zn-m2
   # REPO_URL: https://github.com/LiBwrt/openwrt-6.x
   # REPO_BRANCH: main-nss
-  REPO_URL: https://github.com/openwrt-fork/LiBwrt-op-openwrt-6.x
-  REPO_BRANCH: main
+  REPO_URL: https://github.com/naore/libopenwrt-6.6
+  REPO_BRANCH: k6.12-nss
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: ./config/zn-m2.config
   WRT_THEME: Bootstrap
